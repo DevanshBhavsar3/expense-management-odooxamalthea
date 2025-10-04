@@ -1,6 +1,7 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "../db";
+import { organization } from "better-auth/plugins";
 
 export const auth = betterAuth<BetterAuthOptions>({
 	database: prismaAdapter(prisma, {
@@ -17,4 +18,18 @@ export const auth = betterAuth<BetterAuthOptions>({
 			httpOnly: true,
 		},
 	},
+	plugins: [
+		organization({
+			organizationHooks: {
+				beforeAddMember: async ({ member, user, organization }) => {
+					return {
+						data: {
+							...member,
+							role: member.role === "admin" ? "manager" : "employee",
+						},
+					};
+				},
+			}
+		})
+	]
 });

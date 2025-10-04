@@ -9,6 +9,6 @@ export const appRouter = router({
 		return "OK";
 	}),
 	company: companyRouter,
-	admin: adminRouter
+	admin: adminRouter,
 });
 export type AppRouter = typeof appRouter;

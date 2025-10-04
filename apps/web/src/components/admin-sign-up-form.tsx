@@ -1,3 +1,5 @@
+"use client";
+
 import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
@@ -6,7 +8,7 @@ import Loader from "./loader";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { trpc } from "@/utils/trpc";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -33,7 +35,6 @@ const countries = [
 export default function AdminSignUpForm() {
   const router = useRouter();
   const { isPending } = authClient.useSession();
-  const createCompany = useMutation(trpc.company.create.mutationOptions());
   const [selectedCountry, setSelectedCountry] = useState("");
 
   const form = useForm({
@@ -46,35 +47,43 @@ export default function AdminSignUpForm() {
       currency: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signUp.email(
-        {
-          email: value.email,
-          password: value.password,
-          name: value.name,
-        },
-        {
-          onSuccess: () => {
-            toast.success("Sign up successful");
+      try {
+        const signUpResult = await authClient.signUp.email(
+          {
+            name: value.name,
+            email: value.email,
+            password: value.password,
           },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
+          {
+            onError: (error) => {
+              toast.error(error.error.message || "Sign up failed");
+              throw new Error(error.error.message);
+            },
+          }
+        );
+
+        if (!signUpResult.data) {
+          throw new Error("Sign up failed");
         }
-      );
 
-      createCompany.mutate({
-        name: value.companyName,
-        country: value.country,
-      });
+        const orgResult = await authClient.organization.create({
+          name: value.companyName,
+          slug: value.companyName.toLowerCase().replace(/\s+/g, "-"),
+        });
 
-      if (createCompany.isSuccess) {
-        redirect(`/company/${createCompany.data.company.id}`);
+        toast.success("Account created successfully!");
+
+        // Redirect to the organization dashboard
+        router.push(`/company/${orgResult.data?.id}`);
+      } catch (error) {
+        console.error("Sign up error:", error);
+        toast.error("Failed to create account. Please try again.");
       }
     },
     validators: {
       onSubmit: z.object({
         name: z.string().min(2, "Name must be at least 2 characters"),
-        email: z.email("Invalid email address"),
+        email: z.string().email("Invalid email address"),
         password: z.string().min(8, "Password must be at least 8 characters"),
         companyName: z
           .string()
@@ -97,13 +106,13 @@ export default function AdminSignUpForm() {
   }
 
   return (
-    <div className="h-fit flex justify-center px-6 py-10 bg-stone-200 min-h-screen">
-      <div className="w-full max-w-[520px] bg-white rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.08)] border border-stone-300 p-10 mt-5">
-        <h1 className="text-3xl font-semibold text-blue-800 text-center border-b-2 border-blue-500 pb-2 mb-3 tracking-wide">
+    <div className="h-fit flex justify-center px-6 py-10 bg-background min-h-screen">
+      <div className="w-full max-w-[520px] bg-muted rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.08)] border border-border p-10 mt-5">
+        <h1 className="text-3xl font-semibold text-center border-b-2 pb-2 mb-3 tracking-wide">
           Sign up — Admin Account
         </h1>
-        <p className="text-sm text-center mb-8">
-          The first user will automatically become the Admin.
+        <p className="text-sm text-center mb-8 text-muted-foreground">
+          Create your organization and become the owner.
         </p>
 
         <form
@@ -118,10 +127,7 @@ export default function AdminSignUpForm() {
             <form.Field name="companyName">
               {(field) => (
                 <div className="space-y-2">
-                  <Label
-                    htmlFor={field.name}
-                    className="text-stone-600 font-semibold"
-                  >
+                  <Label htmlFor={field.name} className="font-semibold">
                     Company name
                   </Label>
                   <Input
@@ -144,7 +150,7 @@ export default function AdminSignUpForm() {
           </div>
 
           <div className="flex gap-4 items-start max-sm:flex-col max-sm:gap-3">
-            <div className="flex-[2] max-sm:flex-1">
+            <div className="flex-[2] sm:flex-1">
               <form.Field name="country">
                 {(field) => (
                   <div className="space-y-2">
@@ -158,7 +164,7 @@ export default function AdminSignUpForm() {
                         setSelectedCountry(value);
                       }}
                     >
-                      <SelectTrigger className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white">
+                      <SelectTrigger>
                         <SelectValue placeholder="— select country —" />
                       </SelectTrigger>
                       <SelectContent>
@@ -183,10 +189,7 @@ export default function AdminSignUpForm() {
               <form.Field name="currency">
                 {(field) => (
                   <div className="space-y-2">
-                    <Label
-                      htmlFor={field.name}
-                      className="text-stone-600 font-semibold"
-                    >
+                    <Label htmlFor={field.name} className="font-semibold">
                       Currency
                     </Label>
                     <Input
@@ -197,8 +200,8 @@ export default function AdminSignUpForm() {
                       value={field.state.value}
                       readOnly
                     />
-                    <div className="text-xs text-stone-500 mt-1">
-                      Currency will auto-fill based on selected country
+                    <div className="text-xs mt-1">
+                      Auto-filled based on country
                     </div>
                     {field.state.meta.errors.map((error) => (
                       <p key={error?.message} className="text-red-500 text-sm">
@@ -215,10 +218,7 @@ export default function AdminSignUpForm() {
             <form.Field name="name">
               {(field) => (
                 <div className="space-y-2">
-                  <Label
-                    htmlFor={field.name}
-                    className="text-stone-600 font-semibold"
-                  >
+                  <Label htmlFor={field.name} className="font-semibold">
                     Admin full name
                   </Label>
                   <Input
@@ -229,7 +229,6 @@ export default function AdminSignUpForm() {
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200"
                   />
                   {field.state.meta.errors.map((error) => (
                     <p key={error?.message} className="text-red-500 text-sm">
@@ -245,10 +244,7 @@ export default function AdminSignUpForm() {
             <form.Field name="email">
               {(field) => (
                 <div className="space-y-2">
-                  <Label
-                    htmlFor={field.name}
-                    className="text-stone-600 font-semibold"
-                  >
+                  <Label htmlFor={field.name} className="font-semibold">
                     Admin email
                   </Label>
                   <Input
@@ -259,7 +255,6 @@ export default function AdminSignUpForm() {
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200 text-foreground"
                   />
                   {field.state.meta.errors.map((error) => (
                     <p key={error?.message} className="text-red-500 text-sm">
@@ -275,10 +270,7 @@ export default function AdminSignUpForm() {
             <form.Field name="password">
               {(field) => (
                 <div className="space-y-2">
-                  <Label
-                    htmlFor={field.name}
-                    className="text-stone-600 font-semibold"
-                  >
+                  <Label htmlFor={field.name} className="font-semibold">
                     Password
                   </Label>
                   <Input
@@ -289,7 +281,6 @@ export default function AdminSignUpForm() {
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200"
                   />
                   {field.state.meta.errors.map((error) => (
                     <p key={error?.message} className="text-red-500 text-sm">
@@ -300,42 +291,11 @@ export default function AdminSignUpForm() {
               )}
             </form.Field>
           </div>
-          {/* 
-          <div>
-            <form.Field name="">
-              {(field) => (
-                <div className="space-y-2">
-                  <Label
-                    htmlFor={field.name}
-                    className="text-stone-600 font-semibold"
-                  >
-                    Confirm Password
-                  </Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="password"
-                    placeholder="Confirm password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200"
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p key={error?.message} className="text-red-500 text-sm">
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </form.Field>
-          </div> */}
 
           <form.Subscribe>
             {(state) => (
               <Button
                 type="submit"
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 transition-all duration-300 hover:-translate-y-0.5"
                 disabled={!state.canSubmit || state.isSubmitting}
               >
                 {state.isSubmitting
@@ -346,20 +306,17 @@ export default function AdminSignUpForm() {
           </form.Subscribe>
         </form>
 
-        <div className="mt-5 p-3 bg-stone-50 border border-stone-200 rounded-lg">
-          <p className="text-stone-500 text-xs">
-            Additional settings like roles, manager relationships, and approval
-            rules can be configured later by the Admin inside the app.
+        <div className="mt-5 p-3 border border-border rounded-lg">
+          <p className="text-muted-foreground text-xs">
+            💡 As the owner, you'll be able to invite team members, assign
+            roles, and configure approval workflows after creating your
+            organization.
           </p>
         </div>
 
-        <div className="mt-5 flex justify-between items-center">
-          <Button
-            variant="link"
-            onClick={() => redirect("/login")}
-            className="text-blue-500 hover:text-blue-700 font-medium p-0 h-auto"
-          >
-            ← Login
+        <div className="mt-5 flex justify-center items-center">
+          <Button variant="link" onClick={() => router.push("/login")}>
+            Already have an account? Login →
           </Button>
         </div>
       </div>

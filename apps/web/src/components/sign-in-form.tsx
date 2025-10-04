@@ -12,7 +12,6 @@ import { trpc } from "@/utils/trpc";
 
 export default function SignInForm() {
   const router = useRouter();
-  const companyQuery = useQuery(trpc.company.get.queryOptions());
   const { isPending } = authClient.useSession();
 
   const form = useForm({
@@ -36,8 +35,7 @@ export default function SignInForm() {
         }
       );
 
-      companyQuery.refetch();
-      redirect(`/company/${companyQuery.data?.company?.id}`);
+      // redirect to dashboard
     },
     validators: {
       onSubmit: z.object({
@@ -81,7 +79,6 @@ export default function SignInForm() {
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200"
                 />
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-red-500 text-sm">
@@ -111,7 +108,6 @@ export default function SignInForm() {
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  className="bg-stone-50 border-stone-300 focus:border-blue-500 focus:ring-blue-500/20 focus:bg-white transition-all duration-200"
                 />
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-red-500 text-sm">
@@ -127,7 +123,6 @@ export default function SignInForm() {
           {(state) => (
             <Button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 transition-all duration-300 hover:-translate-y-0.5"
               disabled={!state.canSubmit || state.isSubmitting}
             >
               {state.isSubmitting ? "Logging in..." : "Login"}

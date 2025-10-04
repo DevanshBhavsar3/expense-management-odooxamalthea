@@ -1,58 +1,45 @@
-import prisma from "@/db";
-import { protectedProcedure, publicProcedure, router } from "@/lib/trpc";
 import { z } from "zod";
+import { auth } from "../lib/auth";
+import { protectedProcedure, router } from "@/lib/trpc";
+import prisma from "@/db";
+import { randomUUID } from "crypto";
 
 export const companyRouter = router({
-  get: protectedProcedure.query(async ({ ctx }) => {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: ctx.session.user.id
-      }, include: {
-        company: true
-      }
-    })
-    return {
-      company: user?.company
-    };
-  }),
-  create: protectedProcedure
+  updateEmployee: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(2).max(100),
-        country: z.string().min(2).max(100),
+        companyId: z.string(),
+        employeeId: z.string(),
+        role: z.enum(["member", "admin"]),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      // Create a new company
-      const company = await prisma.company.create({
+    .mutation(async ({ input, ctx }) => {
+      await prisma.member.updateMany({
+        where: {
+          organizationId: input.companyId,
+          userId: input.employeeId,
+        },
         data: {
-          name: input.name,
-          country: input.country,
+          role: input.role,
         },
       });
 
-      // Update user to admin
-      await prisma.user.update({
-        where: {
-          id: ctx.session?.user.id
-        },
-        data: {
-          role: "Admin",
-          companyId: company.id,
-        },
-      })
-
-      return {
-        company,
-      };
+      return { success: true };
     }),
-  getEmployees: protectedProcedure.input(z.object({ companyId: z.string() })).query(async ({ ctx, input }) => {
-    const employees = await prisma.user.findMany({
-      where: {
-        companyId: input.companyId
-      }
-    })
+  createMember: protectedProcedure.input(z.object({
+    name: z.string(),
+    email: z.string()
+  })).mutation(async ({ ctx, input }) => {
+    let user = await prisma.user.findUnique({ where: { email: input.email } });
 
-    return employees
+    if (!user) {
+      await prisma.user.create({
+        data: {
+          id: randomUUID(),
+          name: input.name,
+          email: input.email
+        }
+      })
+    }
   })
-});
+})

@@ -1,9 +1,7 @@
 import { authClient } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
-import Dashboard from "./dashboard";
 import { headers } from "next/headers";
-import { useQuery } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import AdminDashboard from "@/components/admin-dashboard";
 
 export default async function DashboardPage({
   params,
@@ -22,11 +20,22 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
+  const employees = await authClient.organization.listMembers();
+
+  console.log(employees);
+
   return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.data.user.name}</p>
-      <Dashboard session={session.data} id={id} />
-    </div>
+    <AdminDashboard
+      session={session.data}
+      id={id}
+      employees={employees.data?.members?.map((member) => ({
+        ...member,
+        role: member.role as "member" | "admin" | "owner",
+        user: {
+          ...member.user,
+          image: member.user.image ?? undefined,
+        },
+      }))}
+    />
   );
 }
