@@ -1,14 +1,14 @@
+import prisma from "@/db";
 import { protectedProcedure, publicProcedure, router } from "../lib/trpc";
+import z from "zod"
+import { companyRouter } from "./company";
+import { adminRouter } from "./admin";
 
 export const appRouter = router({
 	healthCheck: publicProcedure.query(() => {
 		return "OK";
 	}),
-	privateData: protectedProcedure.query(({ ctx }) => {
-		return {
-			message: "This is private",
-			user: ctx.session.user,
-		};
-	}),
+	company: companyRouter,
+	admin: adminRouter
 });
 export type AppRouter = typeof appRouter;
